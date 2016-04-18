@@ -10,18 +10,18 @@ node {
 
     stage name : 'Build', concurrency : 1
     buildApplication()
-
+    
     stage name : 'Copying the Artifacts'
-
+    
     copingArtifactsBuildWise(compiledBinaryPath,buildArtifactsPath)
-
+    
     stage name : 'Unit Test'
-
+    
     installNuGet(nugetExePath)
     runUnitTest()
-
+    
     stage name : 'Static Code Analysis'
-
+    
     runStaticCodeAnalysis()
 }
 
@@ -31,9 +31,11 @@ def setupConfiguration()
     checkoutURL = 'https://github.com/deadlockV/SampleMVCApp.git'
     // Current Workspace path
     workSpaceDir = pwd()
-
+    
+     CREDENTIALS = 'infostretch_vimalID'
+    
     config = null
-
+    
     if (!(config?.trim())) {
                     config = "Release"
                 }
@@ -47,7 +49,7 @@ def setupConfiguration()
     compiledBinaryPath = workSpaceDir + "\\SampleMVCApp\\bin"
     buildArtifactsPath = null
     if (!(buildArtifactsPath?.trim())) {
-
+                    
                     buildArtifactsPath = workSpaceDir + "\\BuildArtifacts\\${env.BUILD_NUMBER}\\"
                 }
 }
@@ -56,8 +58,25 @@ def sourceCheckout(gitCheckoutURL)
 {
     try
     {
-        checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[url: gitCheckoutURL]]])
-        println 'Git Checkout Successful  '
+checkout changelog: false,
+                poll: false,
+                scm: [$class: 'GitSCM',
+                      branches: [[name: '*/master']],
+                      doGenerateSubmoduleConfigurations: false,
+                      extensions: [[$class: 'SubmoduleOption',
+                                    disableSubmodules: false,
+                                    recursiveSubmodules: true,
+                                    reference: '',
+                                    trackingSubmodules: true],
+                                   [$class: 'CloneOption',
+                                    noTags: true, reference: '',
+                                    shallow: true, timeout: 20]],
+                      submoduleCfg: [],
+                      userRemoteConfigs: [[credentialsId: CREDENTIALS,
+                                           url: gitCheckoutURL]]]
+
+       
+        echo "Git Checkout Successful  "
     }catch (exception) {
         error "Checkout failed : ${exception}"
     }
@@ -68,25 +87,23 @@ def sourceCheckout(gitCheckoutURL)
 def runUnitTest()
 {
 
-    println 'Project directory ' + workSpaceDir
-    println 'PackagesDir directory ' + workSpaceDir
-    println 'Before Installation of nuget exe'
+   
 
    isNUnitRunnerExists = fileExists '${PackagesDir}\\NUnit.Runners.2.6.4\\tools\\nunit-console.exe'
-    if(!isNUnitRunnerExists)
+    if(!isNUnitRunnerExists)  
     {
-        echo 'Installing NUnit Runner Version 2.6.2'
+        echo "Installing NUnit Runner Version 2.6.2"
     //dir(nugetTargetPath){
-
+   
         bat """REM Unit tests
 
         nuget.exe %nuget% install NUnit.Runners -Version 2.6.4 -OutputDirectory "${PackagesDir}"
         "${PackagesDir}\\NUnit.Runners.2.6.4\\tools\\nunit-console.exe" /xml:console-test.xml /config:${config} \"${workSpaceDir}\\SampleMVCApp.Tests\\bin\\${config}\\SampleMVCApp.Tests.dll\""""
-
+        
         // Archieve the Unit Test result
         archieveFiles('console-test.xml')
     }
-
+    
 //}
 
 
@@ -96,13 +113,13 @@ def runUnitTest()
 }
 def installNuGet(nugetExecutionPath)
 {
-    println 'Installing NuGet into :' + nugetExecutionPath
+    echo "Installing NuGet into : ${nugetExecutionPath}"
     try
     {
         isNuGetExists = fileExists 'nuget.exe'
         if(!isNuGetExists)
         {
-            bat """
+            bat """	
             powershell -command Invoke-WebRequest ${sourceNugetExe} -OutFile nuget.exe"""
         }
     }
@@ -115,8 +132,8 @@ def installNuGet(nugetExecutionPath)
   {
       try
       {
-
-        def msbuildtool = tool name: 'MSBuild', type: 'hudson.plugins.msbuild.MsBuildInstallation'
+          
+        def msbuildtool = tool name: 'MSBuild', type: 'hudson.plugins.msbuild.MsBuildInstallation' 
         echo "${msbuildtool}"
         bat """@echo Off
 
@@ -135,37 +152,37 @@ def copingArtifactsBuildWise(sourcePath,destPath)
 {
     try
     {
-
-
+        
+    
         dir(destPath){
-        println 'Copying files from ' + sourcePath + ' to ' + destPath
+        echo "Copying files from ${sourcePath}  to  ${destPath}"
         bat "xcopy /s \"${sourcePath}\" \"${destPath}\""
-        println "Copying Artifacts Successful"
+        echo "Copying Artifacts Successful"
         }
-    }
+    } 
     catch (exception) {
         error "Copying Artifacts failed : ${exception}"
         }
-
+    
 }
 
 def runStaticCodeAnalysis()
 {
-
-
+    
+    
     // FxCop Runner Jenkins Plug-in needs to be installed as a tool in Configure system through manage jenkins
     // If you need to analyze with custom ruleset, you can just type /ruleset:=YourCustomRuleSet.ruleset
     // FxCopCmd /f:SomeAssembly.dll /r:"C:\Rules Directory\SomeRules.dll" /o:OutputFile.xml
-
+    
     try
     {
         def fxcop = tool name: 'FxCopCmd', type: 'org.jenkinsci.plugins.fxcop_runner.FxCopInstallation'
-
+       
         bat """\"${fxcop}\\FxCopCmd.exe\" /gac /f:\"${buildArtifactsPath}\\SampleMVCApp.dll\" /o:\"${workSpaceDir}\\OutputFile.xml\""""
-
+     
         echo "Static Code Analyzer completed successfully"
     }
       catch (exception) {
         error "Static Code Analyzer failed : ${exception}"
         }
-}
+} 
