@@ -19,6 +19,7 @@ node {
     
     //installNuGet(nugetExePath)
     //runUnitTest()
+	// Running MSTest for the unit test
     runMSTestUnitTest()
     stage name : 'Static Code Analysis'
     
