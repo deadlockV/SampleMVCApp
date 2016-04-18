@@ -17,9 +17,9 @@ node {
     
     stage name : 'Unit Test'
     
-    installNuGet(nugetExePath)
-    runUnitTest()
-    
+    //installNuGet(nugetExePath)
+    //runUnitTest()
+    runMSTestUnitTest()
     stage name : 'Static Code Analysis'
     
     runStaticCodeAnalysis()
@@ -58,7 +58,7 @@ def sourceCheckout(gitCheckoutURL)
 {
     try
     {
-checkout changelog: false,
+        checkout changelog: false,
                 poll: false,
                 scm: [$class: 'GitSCM',
                       branches: [[name: '*/master']],
@@ -87,7 +87,11 @@ checkout changelog: false,
 def runUnitTest()
 {
 
-   
+   try
+   {
+       
+       
+       
 
    isNUnitRunnerExists = fileExists '${PackagesDir}\\NUnit.Runners.2.6.4\\tools\\nunit-console.exe'
     if(!isNUnitRunnerExists)  
@@ -97,11 +101,14 @@ def runUnitTest()
    
         bat """REM Unit tests
 
-        nuget.exe %nuget% install NUnit.Runners -Version 2.6.4 -OutputDirectory "${PackagesDir}"
-        "${PackagesDir}\\NUnit.Runners.2.6.4\\tools\\nunit-console.exe" /xml:console-test.xml /config:${config} \"${workSpaceDir}\\SampleMVCApp.Tests\\bin\\${config}\\SampleMVCApp.Tests.dll\""""
+        nuget.exe %nuget% install NUnit.Runners -OutputDirectory "${PackagesDir}"
+        "${PackagesDir}\\NUnit.ConsoleRunner.3.2.0\\tools\\nunit3-console.exe" /config:${config} \"${workSpaceDir}\\SampleMVCApp.Tests\\bin\\${config}\\SampleMVCApp.Tests.dll\""""
         
         // Archieve the Unit Test result
-        archieveFiles('console-test.xml')
+    //    archieveFiles('console-test.xml')
+    }
+   }catch (exception) {
+        error "Error in running Unit Test : ${exception}"
     }
     
 //}
@@ -111,6 +118,32 @@ def runUnitTest()
 
 
 }
+
+def runMSTestUnitTest()
+{
+
+   try
+   {
+     def mstesttool = tool name: 'mstest', type: 'org.jenkinsci.plugins.MsTestInstallation'
+        echo "${mstesttool}"
+        bat """@echo Off
+
+            REM Build
+            \"${mstesttool}\" /testcontainer:\"${workSpaceDir}\\SampleMVCApp.Tests\\bin\\${config}\\SampleMVCApp.Tests.dll\""""
+    echo "MS Test execution successful"
+    
+   }catch (exception) {
+        error "Error in running MS Unit Test : ${exception}"
+    }
+    
+//}
+
+
+
+
+
+}
+
 def installNuGet(nugetExecutionPath)
 {
     echo "Installing NuGet into : ${nugetExecutionPath}"
@@ -138,7 +171,7 @@ def installNuGet(nugetExecutionPath)
         bat """@echo Off
 
             REM Build
-            \"${msbuildtool}\" SampleMVCApp.sln /p:Configuration=${config} /m /v:M /fl /flp:LogFile=msbuild.log;Verbosity=Normal /nr:false"""
+            \"${msbuildtool}\" SampleMVCApp.sln  /t:Rebuild /p:Configuration=${config} /m /v:M /fl /flp:LogFile=msbuild.log;Verbosity=Normal /nr:false"""
         }
         catch (exception) {
         error "Build failed : ${exception}"
